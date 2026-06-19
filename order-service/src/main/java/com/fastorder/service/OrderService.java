@@ -1,33 +1,34 @@
 package com.fastorder.service;
 
+import com.fastorder.client.InventoryClient;
+import com.fastorder.dto.InventoryReservationRequest;
 import com.fastorder.dto.OrderEvent;
 import com.fastorder.entity.Order;
 import com.fastorder.repository.OrderRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final KafkaTemplate<String, OrderEvent> kafkaTemplate;
+    private final InventoryClient inventoryClient;
 
-    // --- MANUALLY ADD THIS CONSTRUCTOR ---
-    public OrderService(OrderRepository orderRepository, KafkaTemplate<String, OrderEvent> kafkaTemplate) {
+    public OrderService(OrderRepository orderRepository, InventoryClient inventoryClient) {
         this.orderRepository = orderRepository;
-        this.kafkaTemplate = kafkaTemplate;
+        this.inventoryClient = inventoryClient;
     }
 
     public void placeOrder(OrderEvent orderEvent) {
+        inventoryClient.reserveInventory(new InventoryReservationRequest(
+                orderEvent.getProductId(),
+                orderEvent.getQuantity()
+        ));
+
         Order order = new Order();
         order.setProductId(orderEvent.getProductId());
         order.setQuantity(orderEvent.getQuantity());
         order.setTotalPrice(orderEvent.getTotalPrice());
 
         orderRepository.save(order);
-
-        kafkaTemplate.send("order-topics", orderEvent);
-        System.out.println("✅ Database Updated & Kafka Message Sent!");
     }
 }
